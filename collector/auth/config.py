@@ -98,5 +98,5 @@ PUBLIC_ENDPOINTS = frozenset({
 
 # Pages HTML : redirection vers /login au lieu d'un JSON 401.
 HTML_ENDPOINTS = frozenset({
-    "auth.dashboard", "trace.trace_detail", "billing.billing_page", "devtools.devtools_page",
+    "auth.dashboard", "auth.dashboard_legacy", "trace.trace_detail", "billing.billing_page", "devtools.devtools_page",
 })

@@ -4,6 +4,7 @@ import secrets
 from datetime import timedelta
 
 import structlog
+from pathlib import Path
 from flask import current_app, g, jsonify, redirect, render_template_string, request, url_for
 
 from collector.db import is_postgres
@@ -332,13 +333,31 @@ def healthz():
         ), 503
 
 
+_SPA_INDEX = Path(__file__).resolve().parents[1] / "static" / "app" / "index.html"
+
+
 @auth_bp.route("/")
 def dashboard():
+    """Nouveau dashboard (SPA Vite, build dans collector/static/app).
+
+    Même origine que l'API : le cookie de session et le middleware fail-closed
+    s'appliquent tels quels. Retombe sur l'ancien dashboard si le build est absent
+    ou si l'on force ?classic=1.
+    """
+    from flask import make_response
+
+    if _SPA_INDEX.is_file() and not request.args.get("classic"):
+        response = make_response(_SPA_INDEX.read_text(encoding="utf-8"))
+        response.headers["Content-Type"] = "text/html; charset=utf-8"
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+    return dashboard_legacy()
+
+
+@auth_bp.route("/legacy")
+def dashboard_legacy():
+    """Ancien dashboard (clés API, budgets, politiques, alertes) en attendant la parité."""
     from collector.dashboard import DASHBOARD_HTML
     from flask import make_response
 
-    return make_response(
-        render_template_string(
-            DASHBOARD_HTML
-        )
-    )
+    return make_response(render_template_string(DASHBOARD_HTML))
