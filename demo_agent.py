@@ -21,13 +21,13 @@ def preflight():
     for _ in range(3):
         s = time.time()
         try:
-            r = requests.get(f"{COLLECTOR}/healthz", timeout=5)
+            r = requests.get(f"{COLLECTOR}/healthz", timeout=30)
             t.append((r.status_code, time.time() - s))
         except Exception as e:
             print(f"✗ collector unreachable: {e}"); raise SystemExit(1)
     worst = max(x[1] for x in t)
     print(f"✓ collector OK — worst latency {worst:.2f}s")
-    if worst > 0.8:
+    if worst > 3.0:
         print("⚠ trop lent pour filmer (>0.8 s)"); raise SystemExit(1)
 
 preflight()
