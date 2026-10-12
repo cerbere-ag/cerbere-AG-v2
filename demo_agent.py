@@ -25,10 +25,15 @@ def preflight():
             t.append((r.status_code, time.time() - s))
         except Exception as e:
             print(f"✗ collector unreachable: {e}"); raise SystemExit(1)
-    worst = max(x[1] for x in t)
-    print(f"✓ collector OK — worst latency {worst:.2f}s")
-    if worst > 3.0:
-        print("⚠ trop lent pour filmer (>0.8 s)"); raise SystemExit(1)
+worst = max(elapsed for _, elapsed in timings)
+print(f"✓ Collector reachable — worst latency {worst:.2f}s")
+
+if worst > 0.8:
+    print(
+        "⚠ Collector response is slow. "
+        "Continuing the demo, but event calls may also be slow."
+    )
+
 
 preflight()
 # Faux secret au format reconnu (ou reprends la constante SECRET de tests/test_taint_flow.py)
