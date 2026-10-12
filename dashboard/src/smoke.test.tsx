@@ -18,7 +18,23 @@ const span = (i: number, extra: object) => ({
   cost_usd: 0.002, input_tokens: 10, output_tokens: 5, created_at: '2026-10-10 23:17:17', detection_layer: null,
   ml_score: null, llm_score: null, llm_reason: null, model: null, ...extra,
 })
+const posts: Record<string, unknown> = {
+  '/api/keys': { status: 'success', key: 'ag_live_SECRET_ONCE_123', key_id: 'k2', name: 'ci' },
+}
 const routes: Record<string, unknown> = {
+  '/api/latency/distribution': { count: 40, p50: 120, p90: 480, p95: 900, p99: 2100, min: 5, max: 3000 },
+  '/api/models': [{ name: 'gpt-4o', requests: 30, avg_latency_ms: 410, total_cost_usd: 0.4, blocked_count: 1, input_tokens: 1000, output_tokens: 500 }],
+  '/api/checks/breakdown': [{ check_name: 'pii', total: 30, flagged: 4, flag_rate: 13.3 }],
+  '/api/spans/expensive': [{ trace_id: 'trace-1', span_id: 'sp-1', span_type: 'llm_call', model: 'gpt-4o', cost_usd: 0.12, prompt: 'Summarize the quarterly report', response: 'ok', input_tokens: 900, output_tokens: 300 }],
+  '/api/insights/flow': { days: 14, links: [{ source: 'SECRET', target: 'http_post', value: 4, blocked: 3 }, { source: 'CONFIDENTIAL', target: 'read_file', value: 6, blocked: 0 }], sources: ['CONFIDENTIAL', 'SECRET'], targets: ['http_post', 'read_file'], total: 10 },
+  '/api/insights/graph': { days: 14, nodes: [{ id: 'agent:support-bot', kind: 'agent', label: 'support-bot', calls: 10, blocked: 3, risk: 40 }, { id: 'tool:http_post', kind: 'tool', label: 'http_post', calls: 4, blocked: 3, risk: 80 }, { id: 'data:SECRET', kind: 'data', label: 'SECRET', calls: 4, blocked: 3, risk: 85 }], edges: [{ source: 'agent:support-bot', target: 'tool:http_post', calls: 4, blocked: 3, risk: 80 }, { source: 'data:SECRET', target: 'tool:http_post', calls: 4, blocked: 3, risk: 85 }] },
+  '/api/insights/tools': { days: 14, sampled: false, tools: [{ tool: 'http_post', kind: 'tool', calls: 4, avg_latency_ms: 800, p95_latency_ms: 900, avg_risk: 80, max_risk: 95, blocked: 3, trace_id: 'trace-1' }, { tool: 'read_file', kind: 'tool', calls: 6, avg_latency_ms: 90, p95_latency_ms: 120, avg_risk: 10, max_risk: 20, blocked: 0, trace_id: 'trace-1' }] },
+  '/api/keys': { keys: [{ id: 'k1', name: 'production', active: true, created_at: '2026-10-01T10:00:00Z', key_preview: 'ag_live_...a1b2' }] },
+  '/api/budgets': { budgets: [{ agent_id: 'support-bot', configured: true, max_budget_usd: 10, period: 'daily', action_on_exceed: 'block', spent_usd: 12, pct: 100, exceeded: true }], total: 1 },
+  '/api/policy-rules': { rules: [{ id: 'r1', agent_scope: 'all', event_type: 'tool_call', tool_name: 'http_post', detection_type: 'pii_detection', operator: '>', threshold: '0.8', action: 'block', enabled: true, created_by: 'me', created_at: null }], total: 1 },
+  '/api/alert-rules': { alert_rules: [{ id: 'a1', metric: 'cost_usd', comparison: 'above', threshold: 5, label: 'Daily spend', active: true }], count: 1 },
+  '/api/alert-destinations': { destinations: [{ id: 'd1', type: 'slack', url: 'https://hooks.slack.com/…xyz', levels: ['critical', 'high'], created_at: null }], total: 1 },
+  '/api/audit/verify': { valid: true, report: {}, verified_at: '2026-10-11T10:00:00' },
   '/api/auth/me': { authenticated: true, type: 'human', user: { email: 'chris@example.com', display_name: null, role: 'admin', org_id: 'o' } },
   '/api/audit/trail': events,
   '/api/audit/summary': { total: 3, blocked: 1, flagged: 1, allowed: 1, high_risk: 1, critical: 0, require_approval: 0, affected_agents: 1 },
@@ -37,7 +53,7 @@ beforeAll(() => {
   Element.prototype.scrollIntoView = () => {}
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
     const path = String(url).split('?')[0]
-    const body = init?.method === 'POST' ? { ok: true } : routes[path]
+    const body = init?.method === 'POST' ? (posts[path] ?? { ok: true }) : init?.method === 'DELETE' || init?.method === 'PUT' || init?.method === 'PATCH' ? { ok: true } : routes[path]
     if (body === undefined) return new Response(JSON.stringify({ error: 'nf' }), { status: 404 })
     return new Response(JSON.stringify(body), { status: 200 })
   }))
@@ -88,8 +104,70 @@ describe('dashboard smoke', () => {
     fireEvent.keyDown(window, { key: 'k', ctrlKey: true })
     expect(await screen.findByPlaceholderText(/Search a trace/)).toBeTruthy()
   })
+  it('performance shows percentiles, models and costly prompts', async () => {
+    go('#/performance')
+    expect(await screen.findByText('Response time p50')).toBeTruthy()
+    expect(await screen.findByText('Summarize the quarterly report')).toBeTruthy()
+    expect((await screen.findAllByText('gpt-4o')).length).toBeGreaterThan(0)
+  })
+  it('data flow, graph and risk pages render their data', async () => {
+    go('#/flow')
+    expect(await screen.findByText('Largest flows')).toBeTruthy()
+    expect((await screen.findAllByText('SECRET')).length).toBeGreaterThan(0)
+    cleanup(); go('#/graph')
+    expect(await screen.findByText('Sensitive data')).toBeTruthy()
+    cleanup(); go('#/risk')
+    expect(await screen.findByText(/slow and risky/)).toBeTruthy()
+    expect((await screen.findAllByText('http_post')).length).toBeGreaterThan(0)
+  })
+  it('compliance exports and verifies the audit chain', async () => {
+    URL.createObjectURL = vi.fn(() => 'blob:x')
+    URL.revokeObjectURL = vi.fn()
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {}) // jsdom ne sait pas télécharger
+    go('#/compliance')
+    expect(await screen.findByText('Security events', { selector: 'h2' })).toBeTruthy()
+    fireEvent.click(await screen.findByRole('button', { name: /Export \d+ events as CSV/ }))
+    expect((URL.createObjectURL as unknown as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1)
+    fireEvent.click(screen.getByRole('button', { name: /Verify audit chain/ }))
+    expect(await screen.findByText('Audit chain intact')).toBeTruthy()
+  })
+  it('settings: keys shows a new key once, integrations fill the host', async () => {
+    go('#/settings')
+    expect(await screen.findByText('production')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Create key' }))
+    expect(await screen.findByText(/ag_live_SECRET_ONCE_123/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: 'Integrations' }))
+    fireEvent.click(await screen.findByRole('tab', { name: 'HTTP Gateway' }))
+    const code = await screen.findByText(/curl -X POST/)
+    expect(code.textContent).toContain(window.location.origin + '/span')
+    expect(code.textContent).not.toContain('YOUR_AGENTGUARD_HOST')
+  })
+  it('settings: budgets, policies and alerts list their items', async () => {
+    go('#/settings?tab=budgets')
+    expect(await screen.findByText(/\$12\.00 of \$10\.00/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: 'Policies' }))
+    expect(await screen.findByText(/pii_detection > 0.8/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Enabled' }))
+    await waitFor(() => expect((fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.some((c) => (c[1] as RequestInit | undefined)?.method === 'PATCH')).toBe(true))
+    fireEvent.click(screen.getByRole('tab', { name: 'Alerts' }))
+    expect(await screen.findByText('Daily spend')).toBeTruthy()
+    expect((await screen.findAllByText('slack', { exact: false })).length).toBeGreaterThan(0)
+  })
+  it('sidebar collapses, remembers it and toggles with Ctrl+B', async () => {
+    localStorage.clear()
+    go('#/')
+    const btn = await screen.findByRole('button', { name: 'Collapse sidebar' })
+    fireEvent.click(btn)
+    expect(screen.getByRole('button', { name: 'Expand sidebar' }).getAttribute('aria-expanded')).toBe('false')
+    expect(localStorage.getItem('cerbere.sidebar.collapsed')).toBe('1')
+    expect(screen.getByRole('link', { name: 'Performance' })).toBeTruthy()
+    fireEvent.keyDown(window, { key: 'b', ctrlKey: true })
+    expect(await screen.findByRole('button', { name: 'Collapse sidebar' })).toBeTruthy()
+    expect(localStorage.getItem('cerbere.sidebar.collapsed')).toBe('0')
+  })
   it('logs no React errors', () => {
     const real = errors.filter((e) => !String((e as unknown[])[0]).includes('not wrapped in act'))
     expect(real).toEqual([])
   })
 })
+
