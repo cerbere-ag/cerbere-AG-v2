@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import App from './App'
+import { INTEGRATIONS } from './lib/integrations'
 
 vi.mock('./components/EChart', () => ({ default: () => <div data-testid="chart" /> }))
 
@@ -165,9 +166,19 @@ describe('dashboard smoke', () => {
     expect(await screen.findByRole('button', { name: 'Collapse sidebar' })).toBeTruthy()
     expect(localStorage.getItem('cerbere.sidebar.collapsed')).toBe('0')
   })
+  it('integration snippets use the real package, import and variables', () => {
+    expect(INTEGRATIONS.map((i) => i.id)).toEqual(['python', 'mcp', 'http', 'openai', 'anthropic', 'langgraph', 'crewai', 'composio'])
+    for (const i of INTEGRATIONS) {
+      expect(i.code, i.id).not.toMatch(/pip install agentguard/) // ce paquet n'existe pas sur PyPI
+      expect(i.code, i.id).not.toMatch(/agentguard_sdk/) // absent du wheel publié
+      expect(i.code, i.id).not.toMatch(/\/api\/spans/) // route inexistante
+      expect(i.code, i.id).not.toMatch(/AGENTGUARD_COLLECTOR_URL/) // la variable MCP est AGENTGUARD_MCP_COLLECTOR_URL
+    }
+    expect(INTEGRATIONS.find((i) => i.id === 'python')!.code).toContain('pip install cerbere-ag')
+    expect(INTEGRATIONS.find((i) => i.id === 'mcp')!.code).toContain('AGENTGUARD_MCP_COLLECTOR_URL')
+  })
   it('logs no React errors', () => {
     const real = errors.filter((e) => !String((e as unknown[])[0]).includes('not wrapped in act'))
     expect(real).toEqual([])
   })
 })
-

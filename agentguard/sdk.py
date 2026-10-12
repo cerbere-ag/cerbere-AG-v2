@@ -1,3 +1,4 @@
+import inspect
 import os
 import time
 import hashlib
@@ -373,6 +374,31 @@ class AgentGuard:
             return result
         return wrapper
 
+    @staticmethod
+    def _bind_tool_params(func: Callable, args: tuple, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+        """Nomme les arguments positionnels d'un outil protégé.
+
+        Sans cela, `send_email("a@b.com", "hi")` perdait ses arguments (TypeError) et, surtout,
+        la politique n'inspectait rien : seuls les arguments nommés étaient évalués.
+        """
+        if not args:
+            return dict(kwargs)
+        sig = inspect.signature(func)
+        bound = sig.bind(*args, **kwargs)  # lève le TypeError natif si l'appel est invalide
+        params: Dict[str, Any] = {}
+        for name, value in bound.arguments.items():
+            kind = sig.parameters[name].kind
+            if kind is inspect.Parameter.VAR_KEYWORD:
+                params.update(value)
+            elif kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.POSITIONAL_ONLY):
+                raise TypeError(
+                    f"{getattr(func, '__name__', 'tool')}(): the parameter '{name}' cannot be passed by name; "
+                    "guarded tools need regular named parameters"
+                )
+            else:
+                params[name] = value
+        return params
+
     def guard_tool_call(
         self,
         tool_name: Optional[str] = None,
@@ -384,14 +410,16 @@ class AgentGuard:
             actual_tool_name = actual_func.__name__
             @wraps(actual_func)
             def wrapper(*args, **kwargs):
-                return self._execute_guarded_tool(actual_tool_name, kwargs, actual_func)
+                params = self._bind_tool_params(actual_func, args, kwargs)
+                return self._execute_guarded_tool(actual_tool_name, params, actual_func)
             return wrapper
 
         if params is None and func is None and isinstance(tool_name, str):
             def decorator(wrapped: Callable):
                 @wraps(wrapped)
                 def wrapper(*args, **kwargs):
-                    return self._execute_guarded_tool(tool_name, kwargs, wrapped)
+                    params = self._bind_tool_params(wrapped, args, kwargs)
+                    return self._execute_guarded_tool(tool_name, params, wrapped)
                 return wrapper
             return decorator
 

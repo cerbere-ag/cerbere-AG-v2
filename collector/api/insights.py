@@ -197,4 +197,3 @@ def api_insights_tools():
         })
     tools.sort(key=lambda t: -t["calls"])
     return jsonify({"days": days, "tools": tools[:100], "sampled": len(rows) >= _MAX_SPANS})
-

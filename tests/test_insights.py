@@ -91,4 +91,3 @@ def test_insights_never_leak_other_orgs(client, auth_headers, sample_span):
     for path in ("flow", "graph", "tools"):
         body = client.get(f"/api/insights/{path}", headers=auth_headers).get_data(as_text=True)
         assert "leak_tool" not in body and "other-agent" not in body, path
-
