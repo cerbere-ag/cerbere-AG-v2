@@ -1,11 +1,21 @@
 import { useState } from 'react'
 import { Command } from 'cmdk'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Activity, Bot, Crosshair, FileCheck2, Gauge, LayoutDashboard, Network, Octagon, Route, Settings, ShieldCheck, Workflow } from 'lucide-react'
+import { Activity, BookOpen, Bot, Crosshair, FileCheck2, Gauge, LayoutDashboard, LifeBuoy, Network, Octagon, Route, Scale, Settings, ShieldCheck, Workflow } from 'lucide-react'
 import { useAgents, useApprovals, useTraces } from '../lib/queries'
 import { ago, shortId } from '../lib/format'
 
-export function CommandPalette({ open, setOpen }: { open: boolean; setOpen: (v: boolean) => void }) {
+export function CommandPalette({
+  open,
+  setOpen,
+  onDocs,
+  onSupport,
+}: {
+  open: boolean
+  setOpen: (v: boolean) => void
+  onDocs: () => void
+  onSupport: () => void
+}) {
   const navigate = useNavigate()
   const [, setParams] = useSearchParams()
   const [query, setQuery] = useState('')
@@ -73,6 +83,18 @@ export function CommandPalette({ open, setOpen }: { open: boolean; setOpen: (v: 
           </Command.Item>
           <Command.Item value="compliance audit export verify" onSelect={() => go('/compliance')}>
             <FileCheck2 size={15} /> Compliance
+          </Command.Item>
+        </Command.Group>
+
+        <Command.Group heading="Help">
+          <Command.Item value="documentation docs help guide" onSelect={() => { setOpen(false); onDocs() }}>
+            <BookOpen size={15} /> Documentation
+          </Command.Item>
+          <Command.Item value="support contact help email" onSelect={() => { setOpen(false); onSupport() }}>
+            <LifeBuoy size={15} /> Contact support
+          </Command.Item>
+          <Command.Item value="legal terms privacy" onSelect={() => { setOpen(false); window.open('/legal', '_blank', 'noopener,noreferrer') }}>
+            <Scale size={15} /> Legal documents
           </Command.Item>
         </Command.Group>
 

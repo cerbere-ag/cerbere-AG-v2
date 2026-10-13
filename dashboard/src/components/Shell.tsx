@@ -2,18 +2,20 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import {
   Activity,
+  BookOpen,
   Bot,
   Crosshair,
-  ExternalLink,
   FileCheck2,
   Gauge,
   LayoutDashboard,
+  LifeBuoy,
   LogOut,
   Network,
   Octagon,
   PanelLeftClose,
   PanelLeftOpen,
   Route,
+  Scale,
   Search,
   Settings,
   ShieldCheck,
@@ -21,7 +23,9 @@ import {
 } from 'lucide-react'
 import { useApprovals, useMe, useTrail } from '../lib/queries'
 import { CommandPalette } from './CommandPalette'
+import { DocsDialog, SupportDialog } from './HelpDialogs'
 import { TraceDrawer } from './TraceDrawer'
+import { LEGAL_URL } from '../lib/links'
 import { useTicker } from './ui'
 
 type Item = { to: string; path: string; search?: string; label: string; icon: ReactNode; badge?: number }
@@ -115,6 +119,8 @@ function LiveDot() {
 
 export function Shell() {
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [docsOpen, setDocsOpen] = useState(false)
+  const [supportOpen, setSupportOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const toggleCollapsed = () =>
     setCollapsed((v) => {
@@ -215,10 +221,20 @@ export function Shell() {
           ))}
         </nav>
         <div className={`space-y-2 border-t border-line py-3 text-[13px] ${collapsed ? 'flex flex-col items-center px-0' : 'px-4'}`}>
-          <a href="/legacy" title="Classic dashboard" aria-label="Classic dashboard" className="flex items-center gap-2 text-dim hover:text-paper">
-            <ExternalLink size={14} />
-            {!collapsed && 'Classic dashboard'}
-          </a>
+          <div className={`flex ${collapsed ? 'flex-col items-center gap-2' : 'items-center gap-4'}`}>
+            <button onClick={() => setDocsOpen(true)} title="Documentation" aria-label="Documentation" className="flex items-center gap-1.5 text-dim hover:text-paper">
+              <BookOpen size={14} />
+              {!collapsed && 'Docs'}
+            </button>
+            <button onClick={() => setSupportOpen(true)} title="Contact support" aria-label="Contact support" className="flex items-center gap-1.5 text-dim hover:text-paper">
+              <LifeBuoy size={14} />
+              {!collapsed && 'Support'}
+            </button>
+            <a href={LEGAL_URL} target="_blank" rel="noopener noreferrer" title="Legal" aria-label="Legal" className="flex items-center gap-1.5 text-dim hover:text-paper">
+              <Scale size={14} />
+              {!collapsed && 'Legal'}
+            </a>
+          </div>
           <div className={`flex items-center ${collapsed ? 'flex-col gap-2' : 'justify-between gap-2'}`}>
             {!collapsed && (
               <span className="truncate text-faint" title={me?.user?.email}>
@@ -279,7 +295,9 @@ export function Shell() {
       </div>
 
       <TraceDrawer />
-      <CommandPalette open={paletteOpen} setOpen={setPaletteOpen} />
+      <CommandPalette open={paletteOpen} setOpen={setPaletteOpen} onDocs={() => setDocsOpen(true)} onSupport={() => setSupportOpen(true)} />
+      <DocsDialog open={docsOpen} onClose={() => setDocsOpen(false)} />
+      <SupportDialog open={supportOpen} onClose={() => setSupportOpen(false)} />
     </div>
   )
 }

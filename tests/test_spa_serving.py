@@ -57,3 +57,11 @@ def test_built_assets_exist_and_are_public(app):
     for ref in refs:
         assert (_APP_DIR / ref.removeprefix("/static/app/")).is_file(), ref
         assert client.get(ref).status_code == 200, ref
+
+
+def test_legal_pages_linked_from_the_dashboard_are_public(app):
+    """Le pied de la barre latérale pointe vers /legal ; ces pages doivent répondre sans connexion."""
+    client = app.test_client()
+    for url in ("/legal", "/terms", "/privacy"):
+        resp = client.get(url)
+        assert resp.status_code == 200, url
